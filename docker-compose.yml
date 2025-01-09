@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: mysql://root:rootpassword@db_container_name:3306/test_chroma
+    networks:
+      - shared_network
+
+networks:
+  shared_network:
+    external: true
+
