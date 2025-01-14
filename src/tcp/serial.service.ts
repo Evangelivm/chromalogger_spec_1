@@ -1,11 +1,16 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { SerialPort } from 'serialport';
+import { SerialPort, ReadlineParser } from 'serialport';
 import { DataService } from './data.service';
 import { QueueService } from '../redis/queue.service';
 
 @Injectable()
 export class SerialService implements OnModuleInit, OnModuleDestroy {
   private port: SerialPort;
+  private parser: ReadlineParser;
+  private isReceivingData = false; // Bandera para verificar actividad
+  private inactivityTimeout: NodeJS.Timeout;
+  private readonly inactivityThreshold = 5000; // Tiempo de inactividad en ms
+  private dataBuffer = '';
 
   constructor(
     private readonly dataService: DataService,
@@ -20,36 +25,57 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     this.disconnect();
   }
 
-  connect() {
-    const portPath = process.env.SERIAL_PORT || '/dev/ttyUSB0';
-    const baudRate = parseInt(process.env.SERIAL_BAUD_RATE || '9600', 10);
+  connect(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      const portPath = process.env.SERIAL_PORT || '/dev/ttyUSB0';
+      const baudRate = parseInt(process.env.BAUD_RATE || '9600', 10);
 
-    this.port = new SerialPort({
-      path: portPath,
-      baudRate: baudRate,
-    });
+      this.port = new SerialPort(
+        {
+          path: portPath,
+          baudRate: baudRate,
+        },
+        (err) => {
+          if (err) {
+            console.error(`Error opening serial port: ${err.message}`);
+            return resolve(false);
+          }
+          console.log(`Serial port ${portPath} opened at ${baudRate} baud`);
+          resolve(true);
+        },
+      );
 
-    this.port.on('open', () => {
-      console.log(`Serial port opened: ${portPath} at baudRate ${baudRate}`);
-    });
+      this.parser = this.port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
-    this.port.on('data', async (data: Buffer) => {
-      try {
-        const receivedData = data.toString();
-        const processedData = this.dataService.processData(receivedData);
-        const serializedData = JSON.stringify(processedData);
+      this.port.on('close', () => {
+        console.warn(`Serial port ${portPath} closed`);
+        this.isReceivingData = false;
+      });
 
-        await this.queueService.enqueueData([serializedData]);
-      } catch (error) {
-        console.error(
-          'Error procesando los datos recibidos por puerto serial:',
-          error.message,
-        );
-      }
-    });
+      this.port.on('error', (err) => {
+        console.error(`Error in serial port: ${err.message}`);
+      });
 
-    this.port.on('error', (err) => {
-      console.error(`Error en el puerto serial: ${err.message}`);
+      this.parser.on('data', async (data: string) => {
+        this.isReceivingData = true;
+        this.resetInactivityTimer();
+        try {
+          //console.log(`Received data: ${data}`);
+          this.dataBuffer += data.trim() + '\n';
+
+          // Check if the message ends with '!!'
+          if (data.includes('!!')) {
+            const processedData = this.dataService.processData(this.dataBuffer);
+            const serializedData = JSON.stringify(processedData);
+            await this.queueService.enqueueData([serializedData]);
+
+            // Clear the buffer after processing
+            this.dataBuffer = '';
+          }
+        } catch (error) {
+          console.error('Error processing serial data:', error.message);
+        }
+      });
     });
   }
 
@@ -57,11 +83,25 @@ export class SerialService implements OnModuleInit, OnModuleDestroy {
     if (this.port && this.port.isOpen) {
       this.port.close((err) => {
         if (err) {
-          console.error(`Error cerrando el puerto serial: ${err.message}`);
+          console.error(`Error closing serial port: ${err.message}`);
         } else {
-          console.log('Puerto serial cerrado');
+          console.log('Serial port closed');
         }
       });
     }
+  }
+
+  private resetInactivityTimer() {
+    if (this.inactivityTimeout) {
+      clearTimeout(this.inactivityTimeout);
+    }
+    this.inactivityTimeout = setTimeout(() => {
+      if (this.isReceivingData) {
+        this.isReceivingData = false;
+      } else {
+        console.log('No se ha recibido datos en un tiempo, desconectando...');
+        this.disconnect();
+      }
+    }, this.inactivityThreshold);
   }
 }

@@ -5,5 +5,6 @@ import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [TcpModule, ConfigModule.forRoot(), RedisModule],
+  providers: [],
 })
 export class AppModule {}

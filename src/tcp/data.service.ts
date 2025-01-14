@@ -33,18 +33,18 @@ export class DataService {
   };
 
   processData(data: string) {
-    const lines = data.split('\n').map((line) => line.trim());
     const result = {};
 
     // Inicializar todas las variables en null para este bloque de datos
     Object.keys(this.codeMap).forEach((code) => {
-      result[this.codeMap[code]] = null; // Inicialmente todas las variables tienen valor null
+      result[this.codeMap[code]] = null;
     });
 
-    // Procesar cada línea de datos recibida
+    // Procesar el string recibido
+    const lines = data.split('\n').filter((line) => line.trim().length > 0);
     for (const line of lines) {
-      const code = line.slice(0, 4); // Extraer el código (primeros 4 caracteres)
-      const value = line.slice(4).trim(); // Extraer el valor restante
+      const code = line.slice(0, 4);
+      const value = line.slice(4).trim();
 
       if (this.codeMap[code]) {
         let processedValue = value;
@@ -57,20 +57,10 @@ export class DataService {
           processedValue = value === '1' ? 'YES' : 'NO';
         }
 
-        // Actualiza el valor procesado en el resultado
         result[this.codeMap[code]] = processedValue;
-
-        // Actualiza también en previousData para mantener el valor retenido
         this.previousData[this.codeMap[code]] = processedValue;
       }
     }
-
-    // Función para formatear la fecha en formato ISO-8601
-    const formatDate = (date: Date) => {
-      return date.toISOString(); // Formato ISO-8601
-    };
-
-    const timestamp = formatDate(new Date());
 
     // Asegurar que siempre se envíen todos los valores retenidos desde previousData si no fueron enviados en este bloque
     Object.keys(this.previousData).forEach((key) => {
@@ -80,16 +70,14 @@ export class DataService {
     });
 
     // Agregar la marca de tiempo al resultado
+    const timestamp = new Date().toISOString();
     result['time'] = timestamp;
-    // result['timestamp'] = timestamp;
-    // console.log('Datos procesados:', { dataGroup: result });
 
     const dataGroup = { dataGroup: [result] };
 
     // Emitir datos a través del WebSocket
     this.websocketGateway.emitData(dataGroup);
 
-    // Retornar el resultado como un array de objetos, con el formato deseado
     return dataGroup;
   }
 }
