@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { codeMap } from '../tcp/code-map';
 
 @Injectable()
 export class MysqlService {
@@ -10,35 +11,45 @@ export class MysqlService {
 
     const parsedData = data.map((item) => JSON.parse(item));
 
+    // const records = parsedData.flatMap((entry) =>
+    //   entry.dataGroup.map((item) => ({
+    //     DEPTH: item.DEPTH,
+    //     HOLE_DEPTH: item.HOLE_DEPTH,
+    //     BLOCK_HEIGHT: item.BLOCK_HEIGHT,
+    //     ROP: item.ROP,
+    //     HOOKLOAD: item.HOOKLOAD,
+    //     SLIPS: item.SLIPS,
+    //     ON_BOTTOM: item.ON_BOTTOM,
+    //     RPM: item.RPM,
+    //     FLOW: item.FLOW,
+    //     SPP: item.SPP,
+    //     SPM1: item.SPM1,
+    //     SPM2: item.SPM2,
+    //     WOB: item.WOB,
+    //     TORQ: item.TORQ,
+    //     INC: item.INC,
+    //     AZM: item.AZM,
+    //     AZMC: item.AZMC,
+    //     GTOT: item.GTOT,
+    //     BTOT: item.BTOT,
+    //     DIP: item.DIP,
+    //     TF: item.TF,
+    //     GAM: item.GAM,
+    //     time: item.time,
+    //     // time: item.timestamp,
+    //     // Convierte el timestamp de texto a Date antes de guardarlo
+    //     //time: this.convertTimestamp(item.timestamp),
+    //   })),
+    // );
     const records = parsedData.flatMap((entry) =>
-      entry.dataGroup.map((item) => ({
-        DEPTH: item.DEPTH,
-        HOLE_DEPTH: item.HOLE_DEPTH,
-        BLOCK_HEIGHT: item.BLOCK_HEIGHT,
-        ROP: item.ROP,
-        HOOKLOAD: item.HOOKLOAD,
-        SLIPS: item.SLIPS,
-        ON_BOTTOM: item.ON_BOTTOM,
-        RPM: item.RPM,
-        FLOW: item.FLOW,
-        SPP: item.SPP,
-        SPM1: item.SPM1,
-        SPM2: item.SPM2,
-        WOB: item.WOB,
-        TORQ: item.TORQ,
-        INC: item.INC,
-        AZM: item.AZM,
-        AZMC: item.AZMC,
-        GTOT: item.GTOT,
-        BTOT: item.BTOT,
-        DIP: item.DIP,
-        TF: item.TF,
-        GAM: item.GAM,
-        time: item.time,
-        // time: item.timestamp,
-        // Convierte el timestamp de texto a Date antes de guardarlo
-        //time: this.convertTimestamp(item.timestamp),
-      })),
+      entry.dataGroup.map((item) => {
+        const record = {};
+        Object.values(codeMap).forEach((key) => {
+          record[key] = item[key];
+        });
+        record['time'] = item.time;
+        return record;
+      }),
     );
 
     try {
