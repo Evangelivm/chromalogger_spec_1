@@ -3,32 +3,25 @@ import { TcpService } from './tcp.service';
 
 @Injectable()
 export class ConnectionManagerService implements OnModuleInit, OnModuleDestroy {
-  private activeService: 'tcp' | null = null;
-
   constructor(private readonly tcpService: TcpService) {}
 
   async onModuleInit() {
     console.log('ConnectionManager iniciado');
-    this.tryConnectServices();
+    await this.waitForConnection(); // Esperar hasta que haya una conexión
+    console.log('Conexión TCP establecida');
   }
 
   async onModuleDestroy() {
     console.log('Desactivando servicios...');
-    if (this.activeService === 'tcp') {
-      this.tcpService.disconnect();
-    }
+    this.tcpService.stopServer(); // Detener el servidor TCP
   }
 
-  private async tryConnectServices() {
-    console.log('Intentando conectar a TCP...');
-
-    // Intentar conectar a TCP
-    const tcpConnected = await this.tcpService.connect();
-    if (tcpConnected) {
-      this.activeService = 'tcp';
-      console.log('TCP conectado exitosamente.');
-    } else {
-      console.error('No se pudo conectar a TCP');
-    }
+  private async waitForConnection(): Promise<void> {
+    return new Promise((resolve) => {
+      // Escuchar el evento "connected" del TcpService
+      this.tcpService.connectionEvent.once('connected', () => {
+        resolve(); // Resolver la promesa cuando haya una conexión
+      });
+    });
   }
 }

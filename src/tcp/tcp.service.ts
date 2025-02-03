@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { Socket } from 'net';
+import { Server, Socket, createServer } from 'net';
+import { EventEmitter } from 'events'; // Importamos EventEmitter
 import { DataService } from './data.service';
 import { QueueService } from '../redis/queue.service';
 import * as dotenv from 'dotenv';
@@ -8,13 +9,10 @@ dotenv.config();
 
 @Injectable()
 export class TcpService implements OnModuleInit, OnModuleDestroy {
-  private client: Socket;
-  private readonly reconnectInterval = 2500; // Tiempo de espera antes de intentar reconectar (en ms)
-  private isConnected = false; // Bandera para verificar si está conectado
-  private isReceivingData = false; // Bandera para verificar actividad
-  private inactivityTimeout: NodeJS.Timeout;
-  private readonly inactivityThreshold = 5000; // Tiempo de inactividad en ms
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private server: Server;
+  private clients: Socket[] = [];
+  private readonly port = parseInt(process.env.TCP_PORT || '1234', 10);
+  public connectionEvent = new EventEmitter(); // EventEmitter para notificar conexiones
 
   constructor(
     private readonly dataService: DataService,
@@ -22,50 +20,37 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.connect();
+    this.startServer();
   }
 
   onModuleDestroy() {
-    this.disconnect();
+    this.stopServer();
   }
 
-  connect(): Promise<boolean> {
-    return new Promise((resolve) => {
-      this.client = new Socket();
+  startServer(): void {
+    this.server = createServer((socket: Socket) => {
+      console.log(
+        'Cliente conectado:',
+        socket.remoteAddress,
+        socket.remotePort,
+      );
 
-      // Obtén el host y el puerto desde las variables de entorno, con valores por defecto
-      const host = process.env.TCP_HOST || '127.0.0.1';
-      const port = parseInt(process.env.TCP_PORT || '1234', 10);
+      // Agregar el cliente a la lista
+      this.clients.push(socket);
 
-      const tryConnect = () => {
-        if (this.isConnected) return; // Evita múltiples intentos si ya está conectado
+      // Notificar que hay una nueva conexión
+      this.connectionEvent.emit('connected'); // Emitir evento "connected"
 
-        this.client.connect(port, host, () => {
-          console.log(`Datalogger connected in ${host}:${port}`);
-          this.isConnected = true;
-          this.resetInactivityTimer();
-          resolve(true);
-        });
-      };
-
-      tryConnect();
-
-      // Evento para intentar reconectar en caso de desconexión
-      this.client.on('close', () => {
-        if (!this.isConnected) return; // Evita múltiples intentos si ya está desconectado
-        console.log('Conexión cerrada, intentando reconectar...');
-        this.isConnected = false;
-        this.reconnectTimeout = setTimeout(tryConnect, this.reconnectInterval);
-      });
-
-      // Maneja los datos recibidos
-      this.client.on('data', async (data) => {
-        this.isReceivingData = true;
-        this.resetInactivityTimer();
+      // Manejar datos recibidos del cliente
+      socket.on('data', async (data) => {
         try {
           const receivedData = data.toString();
+          console.log('Datos recibidos:', receivedData);
+
+          // Procesar los datos
           const processedData = this.dataService.processData(receivedData);
 
+          // Enviar los datos procesados a Redis
           const serializedData = JSON.stringify(processedData);
           await this.queueService.enqueueData([serializedData]);
         } catch (error) {
@@ -76,46 +61,44 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
         }
       });
 
-      // Maneja errores de conexión y reconexión en caso de fallo
-      this.client.on('error', (err) => {
-        console.error(`Error en la conexión: ${err.message}`);
-        if (this.isConnected) {
-          this.isConnected = false;
-          this.reconnectTimeout = setTimeout(
-            tryConnect,
-            this.reconnectInterval,
-          );
-        }
+      // Manejar la desconexión del cliente
+      socket.on('end', () => {
+        console.log(
+          'Cliente desconectado:',
+          socket.remoteAddress,
+          socket.remotePort,
+        );
+        this.clients = this.clients.filter((client) => client !== socket); // Eliminar el cliente de la lista
       });
 
-      // Resolver false si no se puede conectar
-      this.client.on('error', () => resolve(false));
+      // Manejar errores del cliente
+      socket.on('error', (err) => {
+        console.error('Error en la conexión con el cliente:', err.message);
+        this.clients = this.clients.filter((client) => client !== socket); // Eliminar el cliente de la lista
+      });
+    });
+
+    // Escuchar en el puerto especificado
+    this.server.listen(this.port, () => {
+      console.log(`Servidor TCP escuchando en el puerto ${this.port}`);
+    });
+
+    // Manejar errores del servidor
+    this.server.on('error', (err) => {
+      console.error('Error en el servidor TCP:', err.message);
     });
   }
 
-  disconnect() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-    if (this.client) {
-      this.client.end(); // Cierra la conexión TCP
-      this.isConnected = false;
-      console.log('Conexión cerrada');
-    }
-  }
+  stopServer(): void {
+    if (this.server) {
+      // Cerrar todas las conexiones de clientes
+      this.clients.forEach((client) => client.destroy());
+      this.clients = [];
 
-  private resetInactivityTimer() {
-    if (this.inactivityTimeout) {
-      clearTimeout(this.inactivityTimeout);
+      // Cerrar el servidor
+      this.server.close(() => {
+        console.log('Servidor TCP detenido');
+      });
     }
-    this.inactivityTimeout = setTimeout(() => {
-      if (this.isReceivingData) {
-        this.isReceivingData = false;
-      } else {
-        console.log('No se ha recibido datos en un tiempo, desconectando...');
-        this.disconnect();
-      }
-    }, this.inactivityThreshold);
   }
 }

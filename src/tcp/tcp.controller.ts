@@ -5,15 +5,15 @@ import { TcpService } from './tcp.service';
 export class TcpController {
   constructor(private readonly tcpService: TcpService) {}
 
-  @Get('start-tcp')
-  startTcpConnection() {
-    this.tcpService.connect();
-    return 'Conexión TCP iniciada';
+  @Get('start-server')
+  startTcpServer() {
+    this.tcpService.startServer();
+    return 'Servidor TCP iniciado';
   }
 
-  @Get('stop-tcp')
-  stopTcpConnection() {
-    this.tcpService.disconnect();
-    return 'Conexión TCP detenida';
+  @Get('stop-server')
+  stopTcpServer() {
+    this.tcpService.stopServer();
+    return 'Servidor TCP detenido';
   }
 }
