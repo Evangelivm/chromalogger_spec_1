@@ -78,8 +78,8 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
       });
     });
 
-    // Escuchar en el puerto especificado
-    this.server.listen(this.port, () => {
+    // Escuchar en todas las interfaces de red (0.0.0.0)
+    this.server.listen(this.port, '0.0.0.0', () => {
       console.log(`Servidor TCP escuchando en el puerto ${this.port}`);
     });
 
