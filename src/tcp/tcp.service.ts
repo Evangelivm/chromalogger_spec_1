@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Server, Socket, createServer } from 'net';
-import { EventEmitter } from 'events'; // Importamos EventEmitter
+import { EventEmitter } from 'events';
 import { DataService } from './data.service';
 import { QueueService } from '../redis/queue.service';
 import * as dotenv from 'dotenv';
@@ -10,7 +10,7 @@ dotenv.config();
 @Injectable()
 export class TcpService implements OnModuleInit, OnModuleDestroy {
   private server: Server;
-  private clients: Socket[] = [];
+  private clients: Socket[] = []; // Lista de clientes conectados
   private readonly port = parseInt(process.env.TCP_PORT || '1234', 10);
   public connectionEvent = new EventEmitter(); // EventEmitter para notificar conexiones
 
@@ -39,7 +39,7 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
       this.clients.push(socket);
 
       // Notificar que hay una nueva conexión
-      this.connectionEvent.emit('connected'); // Emitir evento "connected"
+      this.connectionEvent.emit('connected');
 
       // Manejar datos recibidos del cliente
       socket.on('data', async (data) => {
@@ -47,12 +47,15 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
           const receivedData = data.toString();
           //console.log('Datos recibidos:', receivedData);
 
-          // Procesar los datos
+          // Procesar los datos (opcional)
           const processedData = this.dataService.processData(receivedData);
 
-          // Enviar los datos procesados a Redis
+          // Enviar los datos procesados a Redis (opcional)
           const serializedData = JSON.stringify(processedData);
           await this.queueService.enqueueData([serializedData]);
+
+          // Retransmitir los datos a todos los clientes conectados (excepto al que envió los datos)
+          this.broadcastData(receivedData, socket);
         } catch (error) {
           console.error(
             'Error procesando los datos o enviando a Redis:',
@@ -78,7 +81,7 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
       });
     });
 
-    // Escuchar en todas las interfaces de red (0.0.0.0)
+    // Escuchar en el puerto especificado
     this.server.listen(this.port, '0.0.0.0', () => {
       console.log(`Servidor TCP escuchando en el puerto ${this.port}`);
     });
@@ -100,5 +103,14 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
         console.log('Servidor TCP detenido');
       });
     }
+  }
+
+  // Método para retransmitir datos a todos los clientes conectados (excepto al que envió los datos)
+  private broadcastData(data: string, senderSocket: Socket): void {
+    this.clients.forEach((client) => {
+      if (client !== senderSocket && !client.destroyed) {
+        client.write(data); // Enviar los datos al cliente
+      }
+    });
   }
 }
