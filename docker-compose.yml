@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - '3000:3000'
+      - '1234:1234'
     devices:
       - '/dev/ttyS3:/dev/ttyS3' # Maps COM3 to container
     environment:

@@ -100,3 +100,15 @@ docker-compose up
 ```
 
 Traten de siempre tener las colas de redis limpias para evitar trabas!!!!!
+
+Si tiene algun problema con redis, puede usar este comando:
+
+```bash
+sudo lsof -i :6379
+```
+
+Saldra una lista, preste atencion al que dice PID, usa este codigo indicando el PID:
+
+```bash
+sudo kill -9 <PID>
+```

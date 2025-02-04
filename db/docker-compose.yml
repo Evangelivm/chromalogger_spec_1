@@ -1,6 +1,6 @@
 services:
   db:
-    image: mysql:8.0
+    image: mysql:8.0-debian
     container_name: db_container_name
     ports:
       - '3306:3306'

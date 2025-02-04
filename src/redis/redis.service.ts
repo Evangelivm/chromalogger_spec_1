@@ -14,6 +14,7 @@ export class RedisService {
     this.redisClient = new Redis({
       host: process.env.REDIS_HOST || 'localhost', // Cambia esto según tu configuración de Redis
       port: parseInt(process.env.REDIS_PORT || '6379'),
+      connectTimeout: 10000,
     });
   }
 

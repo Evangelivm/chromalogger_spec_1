@@ -45,7 +45,7 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
       socket.on('data', async (data) => {
         try {
           const receivedData = data.toString();
-          console.log('Datos recibidos:', receivedData);
+          //console.log('Datos recibidos:', receivedData);
 
           // Procesar los datos
           const processedData = this.dataService.processData(receivedData);
