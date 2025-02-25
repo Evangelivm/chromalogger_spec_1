@@ -31,6 +31,7 @@ model test_record {
   DIP          String?   @db.VarChar(255)
   TF           String?   @db.VarChar(255)
   GAM          String?   @db.VarChar(255)
+  data         String?   @db.Text
   time         DateTime? @db.DateTime(0)
 }
 

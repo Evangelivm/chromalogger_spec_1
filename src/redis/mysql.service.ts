@@ -48,6 +48,7 @@ export class MysqlService {
           record[key] = item[key];
         });
         record['time'] = item.time;
+        record['data'] = item.data;
         return record;
       }),
     );

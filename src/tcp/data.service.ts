@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { WebsocketGateway } from 'src/websocket/websocket.gateway';
 import { codeMap } from './code-map';
+import { create } from 'xmlbuilder2';
 
 @Injectable()
 export class DataService {
@@ -46,6 +47,48 @@ export class DataService {
         result[key] = this.previousData[key];
       }
     });
+
+    // Obtener el nombre del pozo desde las variables de entorno
+    const wellName = process.env.WELL_NAME || 'Default Well Name';
+    const wellboreName = process.env.WELLBORE_NAME || 'Default Wellbore Name';
+
+    // Generar el XML usando xmlbuilder2
+    const xml = create({ version: '1.0', headless: true })
+      .ele('witsml', { version: '1.4.1.1' })
+      .ele('well')
+      .ele('name')
+      .txt(wellName)
+      .up()
+      .ele('wellbore')
+      .ele('name')
+      .txt(wellboreName)
+      .up()
+      .ele('log')
+      .ele('depth', { uom: 'm' })
+      .txt(result['DEPTH'] || '')
+      .up()
+      .ele('holeDepth', { uom: 'm' })
+      .txt(result['HOLE_DEPTH'] || '')
+      .up()
+      .ele('rpm')
+      .txt(result['RPM'] || '')
+      .up()
+      .ele('flowRate')
+      .txt(result['FLOW'] || '')
+      .up()
+      .ele('rop')
+      .txt(result['ROP'] || '')
+      .up()
+      .ele('torque')
+      .txt(result['TORQ'] || '')
+      .up()
+      .up()
+      .up()
+      .up()
+      .end({ prettyPrint: true });
+
+    // Agregar el XML al resultado
+    result['data'] = xml;
 
     // Agregar la marca de tiempo al resultado
     const timestamp = new Date().toISOString();

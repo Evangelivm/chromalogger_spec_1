@@ -1,6 +1,6 @@
 {
   "name": "chromalogger_spec_1",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "description": "",
   "author": "Devy Salomon",
   "private": true,
@@ -33,7 +33,8 @@
     "luxon": "^3.5.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "xmlbuilder2": "^3.1.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
