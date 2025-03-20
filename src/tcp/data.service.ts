@@ -16,7 +16,7 @@ export class DataService {
 
     // Inicializar todas las variables en null para este bloque de datos
     Object.keys(this.codeMap).forEach((code) => {
-      result[this.codeMap[code]] = null;
+      result[this.codeMap[code].db_name] = null;
     });
 
     // Procesar el string recibido
@@ -30,18 +30,18 @@ export class DataService {
 
         // Reemplazo específico para ON_BOTTOM y SLIPS
         if (
-          this.codeMap[code] === 'ON_BOTTOM' ||
-          this.codeMap[code] === 'SLIPS'
+          this.codeMap[code].db_name === 'ON_BOTTOM' ||
+          this.codeMap[code].db_name === 'SLIPS'
         ) {
           processedValue = value === '1' ? 'YES' : 'NO';
         }
 
-        result[this.codeMap[code]] = processedValue;
-        this.previousData[this.codeMap[code]] = processedValue;
+        result[this.codeMap[code].db_name] = processedValue;
+        this.previousData[this.codeMap[code].db_name] = processedValue;
       }
     }
 
-    // Asegurar que siempre se envíen todos los valores retenidos desde previousData si no fueron enviados en este bloque
+    // Asegurar que siempre se envíen todos los valores retenidos desde previousData
     Object.keys(this.previousData).forEach((key) => {
       if (result[key] === null) {
         result[key] = this.previousData[key];
@@ -52,8 +52,8 @@ export class DataService {
     const wellName = process.env.WELL_NAME || 'Default Well Name';
     const wellboreName = process.env.WELLBORE_NAME || 'Default Wellbore Name';
 
-    // Generar el XML usando xmlbuilder2
-    const xml = create({ version: '1.0', headless: true })
+    // Generar el XML usando xmlbuilder2 de manera dinámica
+    const xml = create({ version: '1.0' })
       .ele('witsml', { version: '1.4.1.1' })
       .ele('well')
       .ele('name')
@@ -63,32 +63,27 @@ export class DataService {
       .ele('name')
       .txt(wellboreName)
       .up()
-      .ele('log')
-      .ele('depth', { uom: 'm' })
-      .txt(result['DEPTH'] || '')
-      .up()
-      .ele('holeDepth', { uom: 'm' })
-      .txt(result['HOLE_DEPTH'] || '')
-      .up()
-      .ele('rpm')
-      .txt(result['RPM'] || '')
-      .up()
-      .ele('flowRate')
-      .txt(result['FLOW'] || '')
-      .up()
-      .ele('rop')
-      .txt(result['ROP'] || '')
-      .up()
-      .ele('torque')
-      .txt(result['TORQ'] || '')
+      .ele('log');
+
+    // Agregar dinámicamente los elementos del resultado al XML usando wits_name
+    Object.keys(this.codeMap).forEach((code) => {
+      const { db_name, wits_name } = this.codeMap[code];
+      if (db_name !== 'time' && db_name !== 'data') {
+        xml
+          .ele(wits_name, { uom: 'm' })
+          .txt(result[db_name] || '')
+          .up();
+      }
+    });
+
+    const xmlString = xml
       .up()
       .up()
       .up()
-      .up()
-      .end({ prettyPrint: true });
+      .end({ prettyPrint: false, headless: true, indent: ' ' });
 
     // Agregar el XML al resultado
-    result['data'] = xml;
+    result['data'] = xmlString;
 
     // Agregar la marca de tiempo al resultado
     const timestamp = new Date().toISOString();

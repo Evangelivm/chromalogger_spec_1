@@ -47,15 +47,16 @@ export class TcpService implements OnModuleInit, OnModuleDestroy {
           const receivedData = data.toString();
           //console.log('Datos recibidos:', receivedData);
 
-          // Procesar los datos (opcional)
+          // Procesar los datos
           const processedData = this.dataService.processData(receivedData);
 
           // Enviar los datos procesados a Redis (opcional)
           const serializedData = JSON.stringify(processedData);
           await this.queueService.enqueueData([serializedData]);
 
-          // Retransmitir los datos a todos los clientes conectados (excepto al que envió los datos)
-          this.broadcastData(receivedData, socket);
+          // Retransmitir el XML a todos los clientes conectados (excepto al que envió los datos)
+          const xmlData = processedData.dataGroup[0]['data'];
+          this.broadcastData(xmlData, socket);
         } catch (error) {
           console.error(
             'Error procesando los datos o enviando a Redis:',

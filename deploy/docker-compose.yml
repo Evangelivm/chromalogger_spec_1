@@ -1,0 +1,22 @@
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    ports:
+      - '8080:8080'
+      - '50000:50000'
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock # Permite a Jenkins usar Docker del host
+      - ../:/workspace # Monta el proyecto completo en el contenedor de Jenkins
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    networks:
+      - shared_network
+
+networks:
+  shared_network:
+    external: true # Usa la misma red que tu proyecto existente
+
+volumes:
+  jenkins_home:
